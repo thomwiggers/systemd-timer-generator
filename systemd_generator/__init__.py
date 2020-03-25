@@ -73,7 +73,7 @@ def _render_timer(service_name):
 def _render_service(service_name):
     """Render the systemd.service file"""
     script_name = sys.argv[0]
-    template = _get_jinja_environment().from_string(TEMPLATE_TIMER)
+    template = _get_jinja_environment().from_string(TEMPLATE_SERVICE)
     return template.render(
         service_name=service_name,
         script_name=script_name,
