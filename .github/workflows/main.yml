@@ -9,10 +9,12 @@ jobs:
       - uses: actions/checkout@master
       - name: Install
         uses: abatilo/actions-poetry@v1.5.0
-        args: install
+        with:
+          args: install
       - name: Run build
         uses: abatilo/actions-poetry@v1.5.0
-        args: build
+        with:
+          args: build
       - name: Publish package
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
         uses: pypa/gh-action-pypi-publish@master
