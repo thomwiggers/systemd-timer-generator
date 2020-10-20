@@ -8,12 +8,12 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: Install
-        uses: abatilo/actions-poetry@v1.5.0
+        uses: abatilo/actions-poetry@v1.11.0
         with:
           args: install
           poetry_version: 1.0.5
       - name: Run build
-        uses: abatilo/actions-poetry@v1.5.0
+        uses: abatilo/actions-poetry@v1.11.0
         with:
           args: build
           poetry_version: 1.0.5
