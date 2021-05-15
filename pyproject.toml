@@ -17,7 +17,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.6"
-jinja2 = "^2.11"
+jinja2 = "^3.0"
 python-editor = "^1.0"
 
 [tool.poetry.scripts]
