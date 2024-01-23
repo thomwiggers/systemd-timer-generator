@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "generate-systemd-timer"
-version = "0.1.1"
+version = "0.1.2"
 description = "Generate a systemd unit.timer and unit.service pair"
 license = "MIT"
 authors = [
@@ -16,9 +16,12 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.6"
-jinja2 = "^3.0"
+python = ">=3.8"
+jinja2 = "^3"
 python-editor = "^1.0"
 
 [tool.poetry.scripts]
 generate-systemd-timer = 'systemd_generator:main'
+
+[tool.poetry.group.dev.dependencies]
+twine = "^4.0.2"
