@@ -36,7 +36,7 @@ jobs:
       - name: Check tag name if we're to publish
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
         run: |
-          if ! [[ "$(poetry version -s)" == "${GITHUB_REF##*/}" ]]; then
+          if ! [[ "v$(poetry version -s)" == "${GITHUB_REF##*/}" ]]; then
             echo "Tag does not match!"
             exit 1
           fi
