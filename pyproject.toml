@@ -24,4 +24,4 @@ python-editor = "^1.0"
 generate-systemd-timer = 'systemd_generator:main'
 
 [tool.poetry.group.dev.dependencies]
-twine = "^4.0.2"
+twine = ">=4.0.2,<6.0.0"
