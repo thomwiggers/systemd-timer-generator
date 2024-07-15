@@ -29,7 +29,7 @@ Description=Generated timer for {{ service_name }} by {{ script_name }}
 # Probably not necessary
 #OnClockChange=false     # Activate this unit whenever the clock jumps
 #OnTimezoneChange=false  # Activate whenever the timezone changes
-#WAkeSystem=false        # Resume the system from suspend to activate (if supported)
+#WakeSystem=false        # Resume the system from suspend to activate (if supported)
 #RemainAfterElapse=true  # Keeps the timer in the service manager once elapsed.
 
 [Install]
