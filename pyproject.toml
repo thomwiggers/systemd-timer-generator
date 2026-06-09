@@ -19,10 +19,10 @@ packages = [
 python = ">=3.8"
 jinja2 = "^3"
 python-editor = "^1.0"
-setuptools = "^70.3.0"
+setuptools = ">=70.3,<76.0"
 
 [tool.poetry.scripts]
 generate-systemd-timer = 'systemd_generator:main'
 
 [tool.poetry.group.dev.dependencies]
-twine = ">=4.0.2,<6.0.0"
+twine = ">=4.0.2,<7.0.0"
