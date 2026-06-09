@@ -4,7 +4,9 @@ Generates systemd `.timer` and `.service` units to more easily add cron-like tas
 
 After editing the units, the tool can install them for you: copy them into
 `/etc/systemd/system` or `$HOME/.config/systemd/user` (creating the directory if
-needed), run `systemctl daemon-reload`, and enable and start the timer.
+needed), run `systemctl daemon-reload`, and enable and start the timer. The
+install step is only offered when `systemctl` is available; otherwise the
+generated units are left in the current directory.
 
 ## Usage
 
