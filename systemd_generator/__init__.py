@@ -13,24 +13,37 @@ Description=Generated timer for {{ service_name }} by {{ script_name }}
 #Unit={{ service_name }}.service
 
 # Select one of the following
-#OnCalendar=          # daily / weekly / monthly
-#OnActiveSec=         # Time after this timer has been loaded
-#OnBootSec=           # Time relative to boot
-#OnStartupSec=        # Time relative to systemd manager start; relevant for user login
-#OnUnitActiveSec=     # Defines it relative to when the to-be-started unit was last activated
-#OnUnitInactiveSec=   # Defines it relative to when the to-be-started unit was last deactivated
+# OnCalendar: daily / weekly / monthly
+#OnCalendar=
+# OnActiveSec: Time after this timer has been loaded
+#OnActiveSec=
+# OnBootSec: Time relative to boot
+#OnBootSec=
+# OnStartupSec: Time relative to systemd manager start; relevant for user login
+#OnStartupSec=
+# OnUnitActiveSec: Defines it relative to when the to-be-started unit was last activated
+#OnUnitActiveSec=
+# OnUnitInactiveSec: Defines it relative to when the to-be-started unit was last deactivated
+#OnUnitInactiveSec=
 
 # Optional settings
-#AccuracySec=1m          # Defines the accuracy with which this timer shall elapse
-#RandomizedDelaySec=0    # Defines a randomized delay to be added to the start time
-#Persistent=false        # Also activate if the timer expired while timer was inactive
-                         # Only relevant for OnCalendar
+# AccuracySec: Defines the accuracy with which this timer shall elapse
+#AccuracySec=1m
+# RandomizedDelaySec: Defines a randomized delay to be added to the start time
+#RandomizedDelaySec=0
+# Persistent: Also activate if the timer expired while timer was inactive
+# Only relevant for OnCalendar
+#Persistent=false
 
 # Probably not necessary
-#OnClockChange=false     # Activate this unit whenever the clock jumps
-#OnTimezoneChange=false  # Activate whenever the timezone changes
-#WakeSystem=false        # Resume the system from suspend to activate (if supported)
-#RemainAfterElapse=true  # Keeps the timer in the service manager once elapsed.
+# OnClockChange: Activate this unit whenever the clock jumps
+#OnClockChange=false
+# OnTimezoneChange: Activate whenever the timezone changes
+#OnTimezoneChange=false
+# WakeSystem: Resume the system from suspend to activate (if supported)
+#WakeSystem=false
+# RemainAfterElapse: Keeps the timer in the service manager once elapsed.
+#RemainAfterElapse=true
 
 [Install]
 WantedBy=timers.target
