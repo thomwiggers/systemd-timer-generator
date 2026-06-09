@@ -14,10 +14,10 @@ import pytest
 
 import systemd_generator as sg
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _directive_lines(text):
     """Yield ``(lineno, line)`` for active (uncommented) ``Key=value`` lines.
@@ -38,6 +38,7 @@ def _directive_lines(text):
 # ---------------------------------------------------------------------------
 # Rendering: timer
 # ---------------------------------------------------------------------------
+
 
 class TestRenderTimer:
     def test_returns_str(self):
@@ -72,6 +73,7 @@ class TestRenderTimer:
 # Rendering: service
 # ---------------------------------------------------------------------------
 
+
 class TestRenderService:
     def test_returns_str(self):
         assert isinstance(sg._render_service("backup"), str)
@@ -105,6 +107,7 @@ class TestRenderService:
 # comment lines must begin at column 0.
 # ---------------------------------------------------------------------------
 
+
 class TestCommentFormatting:
     @pytest.mark.parametrize(
         "render", [sg._render_timer, sg._render_service], ids=["timer", "service"]
@@ -127,9 +130,7 @@ class TestCommentFormatting:
             # The hash must be the first non-whitespace character, i.e. there
             # must be no leading whitespace before a comment line.
             if line.lstrip().startswith("#"):
-                assert line == line.lstrip(), (
-                    f"comment line {i} is indented: {line!r}"
-                )
+                assert line == line.lstrip(), f"comment line {i} is indented: {line!r}"
 
     def test_commented_options_are_recoverable(self):
         """Uncommenting a sample directive yields a clean ``Key=value``."""
@@ -149,6 +150,7 @@ class TestCommentFormatting:
 # Rendered output parses as INI-like (sanity check on structure)
 # ---------------------------------------------------------------------------
 
+
 class TestParseable:
     @pytest.mark.parametrize(
         "render", [sg._render_timer, sg._render_service], ids=["timer", "service"]
@@ -165,6 +167,7 @@ class TestParseable:
 # ---------------------------------------------------------------------------
 # _prompt_yes_no
 # ---------------------------------------------------------------------------
+
 
 class TestPromptYesNo:
     def test_non_tty_returns_default_false(self, monkeypatch):
@@ -208,6 +211,7 @@ class TestPromptYesNo:
 # _run
 # ---------------------------------------------------------------------------
 
+
 class TestRun:
     def test_returns_subprocess_exit_code(self, monkeypatch):
         monkeypatch.setattr(subprocess, "call", lambda cmd: 42)
@@ -234,6 +238,7 @@ class TestRun:
 # _manual_instructions
 # ---------------------------------------------------------------------------
 
+
 class TestManualInstructions:
     def test_prints_copy_reload_enable(self, capsys):
         sg._manual_instructions("backup", "/etc/systemd/system")
@@ -246,6 +251,7 @@ class TestManualInstructions:
 # ---------------------------------------------------------------------------
 # _install
 # ---------------------------------------------------------------------------
+
 
 class TestInstall:
     def _patch_run(self, monkeypatch, returns=0):
@@ -385,6 +391,7 @@ class TestInstall:
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
+
 
 class TestMain:
     def test_wrong_arg_count_exits(self, monkeypatch):

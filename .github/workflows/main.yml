@@ -7,26 +7,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Install python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.x'
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@v4
-      - name: Configure poetry to use local environments
+          enable-cache: true
+      - name: Build and check
         run: |
-          poetry config virtualenvs.create true --local
-          poetry config virtualenvs.in-project true --local
-      - uses: actions/cache@v5
-        name: Define a cache for the virtual environment based on the dependencies lock file
-        with:
-          path: ./.venv
-          key: venv-${{ hashFiles('poetry.lock') }}
-      - name: Run build and twine
-        run: |
-          poetry install
-          poetry build
-          poetry run twine check dist/*
+          uv build
+          uvx twine check dist/*
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
@@ -36,7 +24,7 @@ jobs:
       - name: Check tag name if we're to publish
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
         run: |
-          if ! [[ "v$(poetry version -s)" == "${GITHUB_REF##*/}" ]]; then
+          if ! [[ "v$(uv version --short)" == "${GITHUB_REF##*/}" ]]; then
             echo "Tag does not match!"
             exit 1
           fi
