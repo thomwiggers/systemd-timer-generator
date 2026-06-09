@@ -1,11 +1,11 @@
 """Generate systemd timer files"""
+
 import os
 import subprocess
 import sys
 
-import jinja2
 import editor
-
+import jinja2
 
 USER_UNIT_DIR = os.path.expanduser("~/.config/systemd/user")
 SYSTEM_UNIT_DIR = "/etc/systemd/system"
@@ -29,7 +29,8 @@ Description=Generated timer for {{ service_name }} by {{ script_name }}
 #OnStartupSec=
 # OnUnitActiveSec: Defines it relative to when the to-be-started unit was last activated
 #OnUnitActiveSec=
-# OnUnitInactiveSec: Defines it relative to when the to-be-started unit was last deactivated
+# OnUnitInactiveSec: Defines it relative to when the to-be-started unit
+# was last deactivated
 #OnUnitInactiveSec=
 
 # Optional settings
@@ -149,7 +150,9 @@ def _install(service_name):
         return
 
     if not os.path.isdir(target):
-        if _prompt_yes_no(f"Directory {target} does not exist. Create it?", default=True):
+        if _prompt_yes_no(
+            f"Directory {target} does not exist. Create it?", default=True
+        ):
             if _run(sudo + ["mkdir", "-p", target]) != 0:
                 print("Failed to create directory; aborting install.", file=sys.stderr)
                 return
@@ -175,12 +178,12 @@ def main():
 
     service_name = sys.argv[1]
 
-    with open(f'{service_name}.service', 'w') as f:
+    with open(f"{service_name}.service", "w") as f:
         f.write(_render_service(service_name))
-    editor.edit(filename=f'{service_name}.service')
-    with open(f'{service_name}.timer', 'w') as f:
+    editor.edit(filename=f"{service_name}.service")
+    with open(f"{service_name}.timer", "w") as f:
         f.write(_render_timer(service_name))
-    editor.edit(filename=f'{service_name}.timer')
+    editor.edit(filename=f"{service_name}.timer")
 
     if _prompt_yes_no(
         f"\nGenerated {service_name}.service and {service_name}.timer.\n"
