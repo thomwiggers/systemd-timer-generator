@@ -26,3 +26,8 @@ generate-systemd-timer = 'systemd_generator:main'
 
 [tool.poetry.group.dev.dependencies]
 twine = ">=4.0.2,<7.0.0"
+pytest = "^8.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
