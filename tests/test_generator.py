@@ -394,42 +394,159 @@ class TestInstall:
 
 
 class TestValidate:
-    def test_runs_verify_on_both_units(self, monkeypatch):
+    @staticmethod
+    def _write_units(tmp_path):
+        (tmp_path / "backup.service").write_text("[Service]\nExecStart=/bin/true\n")
+        (tmp_path / "backup.timer").write_text("[Timer]\nOnCalendar=daily\n")
+
+    def test_runs_verify_on_both_units(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        self._write_units(tmp_path)
         monkeypatch.setattr(sg, "_has_command", lambda name: True)
         calls = []
-        monkeypatch.setattr(sg, "_run", lambda cmd: calls.append(cmd) or 0)
+        monkeypatch.setattr(sg, "_verify", lambda units: calls.append(units) or (0, ""))
 
-        sg._validate("backup")
-
-        assert calls == [
-            ["systemd-analyze", "verify", "backup.service", "backup.timer"]
-        ]
+        assert sg._validate("backup") is True
+        assert calls == [["backup.service", "backup.timer"]]
 
     def test_skips_when_analyzer_absent(self, monkeypatch, capsys):
         monkeypatch.setattr(sg, "_has_command", lambda name: False)
         calls = []
-        monkeypatch.setattr(sg, "_run", lambda cmd: calls.append(cmd) or 0)
+        monkeypatch.setattr(sg, "_verify", lambda units: calls.append(units) or (0, ""))
 
-        sg._validate("backup")
-
+        assert sg._validate("backup") is True
         assert calls == []
         assert "systemd-analyze" in capsys.readouterr().out
 
-    def test_reports_success(self, monkeypatch, capsys):
+    def test_passing_units_are_not_annotated(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        self._write_units(tmp_path)
         monkeypatch.setattr(sg, "_has_command", lambda name: True)
-        monkeypatch.setattr(sg, "_run", lambda cmd: 0)
+        monkeypatch.setattr(sg, "_verify", lambda units: (0, "all good"))
 
-        sg._validate("backup")
+        assert sg._validate("backup") is True
+        assert sg.VERIFY_COMMENT_BEGIN not in (tmp_path / "backup.timer").read_text()
 
-        assert "passed" in capsys.readouterr().out.lower()
-
-    def test_reports_failure(self, monkeypatch, capsys):
+    def test_failure_annotates_units_as_comments(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        self._write_units(tmp_path)
         monkeypatch.setattr(sg, "_has_command", lambda name: True)
-        monkeypatch.setattr(sg, "_run", lambda cmd: 1)
+        monkeypatch.setattr(
+            sg, "_verify", lambda units: (1, "backup.timer:2: Unknown key Frob")
+        )
 
-        sg._validate("backup")
+        assert sg._validate("backup") is False
+        for unit in ("backup.service", "backup.timer"):
+            text = (tmp_path / unit).read_text()
+            assert sg.VERIFY_COMMENT_BEGIN in text
+            assert "# backup.timer:2: Unknown key Frob" in text
 
-        assert capsys.readouterr().err  # problems reported on stderr
+    def test_failure_reverifies_clean_files(self, monkeypatch, tmp_path):
+        """A prior annotation must be stripped before re-verifying."""
+        monkeypatch.chdir(tmp_path)
+        self._write_units(tmp_path)
+        monkeypatch.setattr(sg, "_has_command", lambda name: True)
+        seen = []
+
+        def _fake_verify(units):
+            # Capture the timer contents at verify time.
+            seen.append((tmp_path / "backup.timer").read_text())
+            return 1, "boom"
+
+        monkeypatch.setattr(sg, "_verify", _fake_verify)
+
+        sg._validate("backup")  # first run annotates
+        sg._validate("backup")  # second run must verify clean text
+
+        assert sg.VERIFY_COMMENT_BEGIN not in seen[1]
+
+
+# ---------------------------------------------------------------------------
+# _verify
+# ---------------------------------------------------------------------------
+
+
+class TestVerify:
+    def test_captures_returncode_and_output(self, monkeypatch):
+        seen = {}
+
+        class _Proc:
+            returncode = 3
+            stdout = "some output"
+
+        def _fake_run(cmd, **kwargs):
+            seen["cmd"] = cmd
+            seen["kwargs"] = kwargs
+            return _Proc()
+
+        monkeypatch.setattr(subprocess, "run", _fake_run)
+
+        rc, output = sg._verify(["backup.service", "backup.timer"])
+
+        assert rc == 3
+        assert output == "some output"
+        assert seen["cmd"] == [
+            "systemd-analyze",
+            "verify",
+            "backup.service",
+            "backup.timer",
+        ]
+        # stderr folded into stdout so problems (reported on stderr) are captured
+        assert seen["kwargs"]["stderr"] == subprocess.STDOUT
+
+
+# ---------------------------------------------------------------------------
+# verify comment annotations
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyComments:
+    def test_strip_removes_block(self):
+        text = (
+            "[Timer]\n"
+            "OnCalendar=daily\n"
+            f"{sg.VERIFY_COMMENT_BEGIN}\n"
+            "# boom\n"
+            f"{sg.VERIFY_COMMENT_END}\n"
+        )
+        assert sg._strip_verify_comments(text) == "[Timer]\nOnCalendar=daily\n"
+
+    def test_strip_noop_without_block(self):
+        text = "[Timer]\nOnCalendar=daily\n"
+        assert sg._strip_verify_comments(text) == text
+
+    def test_annotate_appends_comment_block(self, tmp_path):
+        path = tmp_path / "backup.timer"
+        path.write_text("[Timer]\nOnCalendar=daily\n")
+
+        sg._annotate_with_verify(str(path), "line one\nline two")
+
+        text = path.read_text()
+        assert "# line one" in text
+        assert "# line two" in text
+        assert text.startswith("[Timer]\nOnCalendar=daily\n")
+
+    def test_annotate_replaces_existing_block(self, tmp_path):
+        path = tmp_path / "backup.timer"
+        path.write_text("[Timer]\nOnCalendar=daily\n")
+
+        sg._annotate_with_verify(str(path), "old problem")
+        sg._annotate_with_verify(str(path), "new problem")
+
+        text = path.read_text()
+        assert "# new problem" in text
+        assert "# old problem" not in text
+        assert text.count(sg.VERIFY_COMMENT_BEGIN) == 1
+
+    def test_annotate_comment_lines_start_at_column_zero(self, tmp_path):
+        path = tmp_path / "backup.timer"
+        path.write_text("[Timer]\nOnCalendar=daily\n")
+
+        sg._annotate_with_verify(str(path), "  indented problem")
+
+        for line in path.read_text().splitlines():
+            if line.lstrip().startswith("#"):
+                assert line == line.lstrip()
 
 
 # ---------------------------------------------------------------------------
@@ -497,7 +614,7 @@ class TestMain:
         monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
         monkeypatch.setattr(sg, "_has_command", lambda name: True)
         monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: True)
-        monkeypatch.setattr(sg, "_validate", lambda name: None)
+        monkeypatch.setattr(sg, "_validate", lambda name: True)
         installed = []
         monkeypatch.setattr(sg, "_install", lambda name: installed.append(name))
 
@@ -511,6 +628,7 @@ class TestMain:
         monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
         monkeypatch.setattr(sg, "_has_command", lambda name: True)
         monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: False)
+        monkeypatch.setattr(sg, "_validate", lambda name: True)
         installed = []
         monkeypatch.setattr(sg, "_install", lambda name: installed.append(name))
 
@@ -540,31 +658,71 @@ class TestMain:
         assert not any("Install" in p for p in prompts)
         assert "systemctl" in capsys.readouterr().out
 
-    def test_validate_invoked_when_confirmed(self, monkeypatch, tmp_path):
+    def test_validate_always_runs(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(sys, "argv", ["prog", "backup"])
         monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
-        monkeypatch.setattr(sg, "_has_command", lambda name: name == "systemd-analyze")
-        monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: True)
+        monkeypatch.setattr(sg, "_has_command", lambda name: False)
+        # No prompt should gate validation; it runs unconditionally.
+        monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: False)
         validated = []
-        monkeypatch.setattr(sg, "_validate", lambda name: validated.append(name))
+        monkeypatch.setattr(
+            sg, "_validate", lambda name: validated.append(name) or True
+        )
 
         sg.main()
 
         assert validated == ["backup"]
 
-    def test_validate_skipped_without_analyzer(self, monkeypatch, tmp_path):
+    def test_failed_validation_reopens_editor(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(sys, "argv", ["prog", "backup"])
-        monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
         monkeypatch.setattr(sg, "_has_command", lambda name: False)
         monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: True)
-        validated = []
-        monkeypatch.setattr(sg, "_validate", lambda name: validated.append(name))
+        edits = []
+        monkeypatch.setattr(sg.editor, "edit", lambda filename: edits.append(filename))
+        # Fail the first validation, pass after the re-edit.
+        results = iter([False, True])
+        monkeypatch.setattr(sg, "_validate", lambda name: next(results))
 
         sg.main()
 
-        assert validated == []
+        # Both units edited once initially, then again after the failure.
+        assert edits.count("backup.service") == 2
+        assert edits.count("backup.timer") == 2
+
+    def test_failed_validation_stops_when_declined(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["prog", "backup"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+        monkeypatch.setattr(sg, "_has_command", lambda name: False)
+        monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: False)
+        edits = []
+        monkeypatch.setattr(sg.editor, "edit", lambda filename: edits.append(filename))
+        monkeypatch.setattr(sg, "_validate", lambda name: False)
+
+        sg.main()
+
+        # Declined re-edit: only the initial edit of each unit.
+        assert edits.count("backup.service") == 1
+        assert edits.count("backup.timer") == 1
+
+    def test_failed_validation_does_not_loop_when_non_interactive(
+        self, monkeypatch, tmp_path
+    ):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["prog", "backup"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+        monkeypatch.setattr(sg, "_has_command", lambda name: False)
+        edits = []
+        monkeypatch.setattr(sg.editor, "edit", lambda filename: edits.append(filename))
+        # Always fail; without a tty the loop must not spin forever.
+        monkeypatch.setattr(sg, "_validate", lambda name: False)
+
+        sg.main()
+
+        assert edits.count("backup.service") == 1
 
     def test_writes_units_without_systemctl(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)

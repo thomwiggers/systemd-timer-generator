@@ -135,19 +135,99 @@ def _manual_instructions(service_name, target):
     )
 
 
+VERIFY_COMMENT_BEGIN = "# === systemd-analyze verify ==="
+VERIFY_COMMENT_END = "# === end systemd-analyze verify ==="
+
+
+def _verify(units):
+    """Run ``systemd-analyze verify`` capturing its output.
+
+    Returns ``(returncode, output)`` where ``output`` is the combined
+    stdout/stderr (systemd-analyze reports problems on stderr).
+    """
+    cmd = ["systemd-analyze", "verify", *units]
+    print(f"+ {' '.join(cmd)}")
+    proc = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    return proc.returncode, proc.stdout
+
+
+def _strip_verify_comments(text):
+    """Remove a previously-inserted verify comment block from unit text."""
+    out = []
+    skipping = False
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped == VERIFY_COMMENT_BEGIN:
+            skipping = True
+            continue
+        if stripped == VERIFY_COMMENT_END:
+            skipping = False
+            continue
+        if not skipping:
+            out.append(line)
+    return "".join(out)
+
+
+def _clear_verify_comments(path):
+    """Drop any verify comment block from the unit file at ``path``."""
+    with open(path) as f:
+        text = f.read()
+    with open(path, "w") as f:
+        f.write(_strip_verify_comments(text))
+
+
+def _annotate_with_verify(path, output):
+    """Append ``output`` as a verify comment block to the unit at ``path``.
+
+    Any existing block is replaced so the annotations do not accumulate.
+    """
+    with open(path) as f:
+        text = _strip_verify_comments(f.read())
+    if text and not text.endswith("\n"):
+        text += "\n"
+    block_lines = [VERIFY_COMMENT_BEGIN]
+    for line in output.splitlines():
+        block_lines.append(f"# {line}".rstrip())
+    block_lines.append(VERIFY_COMMENT_END)
+    with open(path, "w") as f:
+        f.write(text + "\n".join(block_lines) + "\n")
+
+
 def _validate(service_name):
-    """Run ``systemd-analyze verify`` on the generated units."""
+    """Run ``systemd-analyze verify`` on the generated units.
+
+    The combined verify output is echoed and, on failure, appended to each
+    unit file as a comment block so the problems are visible when the file is
+    reopened in the editor. Returns ``True`` when the units are valid (or when
+    ``systemd-analyze`` is unavailable and validation is skipped), ``False``
+    when verify reports problems.
+    """
     if not _has_command("systemd-analyze"):
         print("systemd-analyze not found; skipping validation.")
-        return
+        return True
     units = [f"{service_name}.service", f"{service_name}.timer"]
-    if _run(["systemd-analyze", "verify", *units]) == 0:
+    # Verify the clean files; never feed a previous annotation back in.
+    for unit in units:
+        _clear_verify_comments(unit)
+    returncode, output = _verify(units)
+    if output.strip():
+        print(output)
+    if returncode == 0:
         print("Units passed systemd-analyze verify.")
-    else:
-        print(
-            "systemd-analyze verify reported problems (see above).",
-            file=sys.stderr,
-        )
+        return True
+    for unit in units:
+        _annotate_with_verify(unit, output)
+    print(
+        "systemd-analyze verify reported problems; "
+        "annotated the units (see the comment block).",
+        file=sys.stderr,
+    )
+    return False
 
 
 def _install(service_name):
@@ -208,10 +288,18 @@ def main():
 
     print(f"\nGenerated {service_name}.service and {service_name}.timer.")
 
-    if _has_command("systemd-analyze") and _prompt_yes_no(
-        "Validate the units with systemd-analyze verify?", default=True
-    ):
-        _validate(service_name)
+    # Validate; on failure the units are annotated with the problems and the
+    # editor is reopened so they can be fixed. Only loop when interactive.
+    while not _validate(service_name):
+        if not (
+            sys.stdin.isatty()
+            and _prompt_yes_no(
+                "Validation failed. Re-edit the units to fix it?", default=True
+            )
+        ):
+            break
+        editor.edit(filename=f"{service_name}.service")
+        editor.edit(filename=f"{service_name}.timer")
 
     if not _has_command("systemctl"):
         print("systemctl not found; skipping install.")

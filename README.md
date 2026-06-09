@@ -8,9 +8,8 @@ needed), run `systemctl daemon-reload`, and enable and start the timer. The
 install step is only offered when `systemctl` is available; otherwise the
 generated units are left in the current directory.
 
-After editing, the tool offers to check the units with `systemd-analyze
-verify` (when that command is available), so syntax errors are caught before
-installation.
+After editing, the tool checks the units with `systemd-analyze verify` (when
+that command is available), so syntax errors are caught before installation.
 
 ## Usage
 
