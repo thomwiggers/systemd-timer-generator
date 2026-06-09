@@ -135,6 +135,21 @@ def _manual_instructions(service_name, target):
     )
 
 
+def _validate(service_name):
+    """Run ``systemd-analyze verify`` on the generated units."""
+    if not _has_command("systemd-analyze"):
+        print("systemd-analyze not found; skipping validation.")
+        return
+    units = [f"{service_name}.service", f"{service_name}.timer"]
+    if _run(["systemd-analyze", "verify", *units]) == 0:
+        print("Units passed systemd-analyze verify.")
+    else:
+        print(
+            "systemd-analyze verify reported problems (see above).",
+            file=sys.stderr,
+        )
+
+
 def _install(service_name):
     """Offer to copy the units into place, reload systemd and enable the timer."""
     units = [f"{service_name}.service", f"{service_name}.timer"]
@@ -192,6 +207,11 @@ def main():
     editor.edit(filename=f"{service_name}.timer")
 
     print(f"\nGenerated {service_name}.service and {service_name}.timer.")
+
+    if _has_command("systemd-analyze") and _prompt_yes_no(
+        "Validate the units with systemd-analyze verify?", default=True
+    ):
+        _validate(service_name)
 
     if not _has_command("systemctl"):
         print("systemctl not found; skipping install.")

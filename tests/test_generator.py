@@ -389,6 +389,50 @@ class TestInstall:
 
 
 # ---------------------------------------------------------------------------
+# _validate
+# ---------------------------------------------------------------------------
+
+
+class TestValidate:
+    def test_runs_verify_on_both_units(self, monkeypatch):
+        monkeypatch.setattr(sg, "_has_command", lambda name: True)
+        calls = []
+        monkeypatch.setattr(sg, "_run", lambda cmd: calls.append(cmd) or 0)
+
+        sg._validate("backup")
+
+        assert calls == [
+            ["systemd-analyze", "verify", "backup.service", "backup.timer"]
+        ]
+
+    def test_skips_when_analyzer_absent(self, monkeypatch, capsys):
+        monkeypatch.setattr(sg, "_has_command", lambda name: False)
+        calls = []
+        monkeypatch.setattr(sg, "_run", lambda cmd: calls.append(cmd) or 0)
+
+        sg._validate("backup")
+
+        assert calls == []
+        assert "systemd-analyze" in capsys.readouterr().out
+
+    def test_reports_success(self, monkeypatch, capsys):
+        monkeypatch.setattr(sg, "_has_command", lambda name: True)
+        monkeypatch.setattr(sg, "_run", lambda cmd: 0)
+
+        sg._validate("backup")
+
+        assert "passed" in capsys.readouterr().out.lower()
+
+    def test_reports_failure(self, monkeypatch, capsys):
+        monkeypatch.setattr(sg, "_has_command", lambda name: True)
+        monkeypatch.setattr(sg, "_run", lambda cmd: 1)
+
+        sg._validate("backup")
+
+        assert capsys.readouterr().err  # problems reported on stderr
+
+
+# ---------------------------------------------------------------------------
 # _has_command
 # ---------------------------------------------------------------------------
 
@@ -453,6 +497,7 @@ class TestMain:
         monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
         monkeypatch.setattr(sg, "_has_command", lambda name: True)
         monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: True)
+        monkeypatch.setattr(sg, "_validate", lambda name: None)
         installed = []
         monkeypatch.setattr(sg, "_install", lambda name: installed.append(name))
 
@@ -494,6 +539,32 @@ class TestMain:
         assert installed == []
         assert not any("Install" in p for p in prompts)
         assert "systemctl" in capsys.readouterr().out
+
+    def test_validate_invoked_when_confirmed(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["prog", "backup"])
+        monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
+        monkeypatch.setattr(sg, "_has_command", lambda name: name == "systemd-analyze")
+        monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: True)
+        validated = []
+        monkeypatch.setattr(sg, "_validate", lambda name: validated.append(name))
+
+        sg.main()
+
+        assert validated == ["backup"]
+
+    def test_validate_skipped_without_analyzer(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["prog", "backup"])
+        monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
+        monkeypatch.setattr(sg, "_has_command", lambda name: False)
+        monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: True)
+        validated = []
+        monkeypatch.setattr(sg, "_validate", lambda name: validated.append(name))
+
+        sg.main()
+
+        assert validated == []
 
     def test_writes_units_without_systemctl(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
