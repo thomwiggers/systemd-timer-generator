@@ -35,6 +35,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "docker: integration tests that build and run a Docker container (deselect with '-m \"not docker\"')",
+]
 
 [tool.ruff]
 target-version = "py38"
