@@ -1,6 +1,7 @@
 """Generate systemd timer files"""
 
 import os
+import shutil
 import subprocess
 import sys
 
@@ -120,6 +121,11 @@ def _run(cmd):
     return subprocess.call(cmd)
 
 
+def _has_command(name):
+    """Return whether ``name`` is an executable on the PATH."""
+    return shutil.which(name) is not None
+
+
 def _manual_instructions(service_name, target):
     print(
         "\nTo install manually:\n"
@@ -185,11 +191,13 @@ def main():
         f.write(_render_timer(service_name))
     editor.edit(filename=f"{service_name}.timer")
 
-    if _prompt_yes_no(
-        f"\nGenerated {service_name}.service and {service_name}.timer.\n"
-        "Install them now?",
-        default=False,
-    ):
+    print(f"\nGenerated {service_name}.service and {service_name}.timer.")
+
+    if not _has_command("systemctl"):
+        print("systemctl not found; skipping install.")
+        return
+
+    if _prompt_yes_no("Install them now?", default=False):
         _install(service_name)
 
 

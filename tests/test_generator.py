@@ -389,6 +389,21 @@ class TestInstall:
 
 
 # ---------------------------------------------------------------------------
+# _has_command
+# ---------------------------------------------------------------------------
+
+
+class TestHasCommand:
+    def test_present(self, monkeypatch):
+        monkeypatch.setattr(sg.shutil, "which", lambda name: "/usr/bin/" + name)
+        assert sg._has_command("systemctl") is True
+
+    def test_absent(self, monkeypatch):
+        monkeypatch.setattr(sg.shutil, "which", lambda name: None)
+        assert sg._has_command("systemctl") is False
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -436,6 +451,7 @@ class TestMain:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(sys, "argv", ["prog", "backup"])
         monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
+        monkeypatch.setattr(sg, "_has_command", lambda name: True)
         monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: True)
         installed = []
         monkeypatch.setattr(sg, "_install", lambda name: installed.append(name))
@@ -448,6 +464,7 @@ class TestMain:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(sys, "argv", ["prog", "backup"])
         monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
+        monkeypatch.setattr(sg, "_has_command", lambda name: True)
         monkeypatch.setattr(sg, "_prompt_yes_no", lambda *a, **k: False)
         installed = []
         monkeypatch.setattr(sg, "_install", lambda name: installed.append(name))
@@ -455,3 +472,36 @@ class TestMain:
         sg.main()
 
         assert installed == []
+
+    def test_install_not_offered_without_systemctl(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["prog", "backup"])
+        monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
+        monkeypatch.setattr(sg, "_has_command", lambda name: False)
+        installed = []
+        monkeypatch.setattr(sg, "_install", lambda name: installed.append(name))
+        # Even if the user would say yes, install must not be offered.
+        prompts = []
+
+        def _record_prompt(question, default=False):
+            prompts.append(question)
+            return True
+
+        monkeypatch.setattr(sg, "_prompt_yes_no", _record_prompt)
+
+        sg.main()
+
+        assert installed == []
+        assert not any("Install" in p for p in prompts)
+        assert "systemctl" in capsys.readouterr().out
+
+    def test_writes_units_without_systemctl(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["prog", "backup"])
+        monkeypatch.setattr(sg.editor, "edit", lambda filename: None)
+        monkeypatch.setattr(sg, "_has_command", lambda name: False)
+
+        sg.main()
+
+        assert (tmp_path / "backup.service").is_file()
+        assert (tmp_path / "backup.timer").is_file()
