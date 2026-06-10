@@ -45,7 +45,7 @@ jobs:
           name: "builds"
           path: "dist/"
       - name: Create release on Github
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*
