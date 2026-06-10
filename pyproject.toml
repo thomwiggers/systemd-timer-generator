@@ -1,6 +1,6 @@
 [project]
 name = "generate-systemd-timer"
-version = "2.0.0"
+version = "2.1.0"
 description = "Generate a systemd unit.timer and unit.service pair"
 license = "MIT"
 readme = "README.md"
