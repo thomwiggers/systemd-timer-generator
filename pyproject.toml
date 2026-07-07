@@ -11,7 +11,7 @@ authors = [
 dependencies = [
     "jinja2>=3,<4",
     "python-editor>=1.0,<2",
-    "setuptools>=70.3,<76.0",
+    "setuptools>=70.3,<83.0",
 ]
 
 [project.urls]
@@ -29,7 +29,7 @@ packages = ["systemd_generator"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8,<9",
+    "pytest>=8,<10",
 ]
 
 [tool.pytest.ini_options]
